@@ -10,6 +10,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
 from pathlib import Path
+from pymongo import MongoClient
+import json
+
+# Initialize MongoDB client
+client = MongoClient('mongodb://localhost:27017/')
+db = client['highschool']
+activities_collection = db['activities']
 
 app = FastAPI(title="Mergington High School API",
               description="API for viewing and signing up for extracurricular activities")
@@ -19,8 +26,8 @@ current_dir = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
           "static")), name="static")
 
-# In-memory activity database
-activities = {
+# Initial activities data
+initial_activities = {
     "Chess Club": {
         "description": "Learn strategies and compete in chess tournaments",
         "schedule": "Fridays, 3:30 PM - 5:00 PM",
@@ -80,6 +87,11 @@ activities = {
     }
 }
 
+# Initialize database with initial data if empty
+if activities_collection.count_documents({}) == 0:
+    for name, details in initial_activities.items():
+        activities_collection.insert_one({"_id": name, **details})
+
 
 @app.get("/")
 def root():
@@ -88,6 +100,11 @@ def root():
 
 @app.get("/activities")
 def get_activities():
+    activities = {}
+    cursor = activities_collection.find({})
+    for doc in cursor:
+        name = doc.pop('_id')
+        activities[name] = doc
     return activities
 
 
@@ -95,18 +112,21 @@ def get_activities():
 def signup_for_activity(activity_name: str, email: str):
     """Sign up a student for an activity"""
     # Validate activity exists
-    if activity_name not in activities:
+    activity = activities_collection.find_one({"_id": activity_name})
+    if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
-
-    # Get the specific activity
-    activity = activities[activity_name]
 
     # Make sure student isn't already signed up
     if email in activity["participants"]:
         raise HTTPException(status_code=400, detail="Student already signed up")
     
     # Add student
-    activity["participants"].append(email)
+    result = activities_collection.update_one(
+        {"_id": activity_name},
+        {"$push": {"participants": email}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to update activity")
     return {"message": f"Signed up {email} for {activity_name}"}
 
 
@@ -116,10 +136,16 @@ from fastapi import Request
 @app.delete("/activities/{activity_name}/unregister")
 def unregister_from_activity(activity_name: str, email: str):
     """Remove a student from an activity"""
-    if activity_name not in activities:
+    activity = activities_collection.find_one({"_id": activity_name})
+    if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
-    activity = activities[activity_name]
     if email not in activity["participants"]:
         raise HTTPException(status_code=400, detail="Student not registered")
-    activity["participants"].remove(email)
+    
+    result = activities_collection.update_one(
+        {"_id": activity_name},
+        {"$pull": {"participants": email}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to update activity")
     return {"message": f"Unregistered {email} from {activity_name}"}
