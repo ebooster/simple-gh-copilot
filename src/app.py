@@ -127,6 +127,10 @@ def signup_for_activity(activity_name: str, email: str):
     )
     if result.modified_count == 0:
         raise HTTPException(status_code=500, detail="Failed to update activity")
+
+    if len(activity["participants"]) + 1 > activity["max_participants"]:
+        raise HTTPException(status_code=400, detail="Activity is full")
+    
     return {"message": f"Signed up {email} for {activity_name}"}
 
 
