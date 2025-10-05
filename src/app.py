@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 from pymongo import MongoClient
 import json
+import logging
 
 # Initialize MongoDB client
 client = MongoClient('mongodb://localhost:27017/')
@@ -120,15 +121,17 @@ def signup_for_activity(activity_name: str, email: str):
     if email in activity["participants"]:
         raise HTTPException(status_code=400, detail="Student already signed up")
     
+    # Check if activity is full
+    if len(activity["participants"]) + 1 > activity["max_participants"]:
+        #log that activity is full using python logging
+        logging.warning(f"Max participants exceeded for {activity_name}")
+        raise HTTPException(status_code=400, detail="Activity is full")
+    
     # Add student
     result = activities_collection.update_one(
         {"_id": activity_name},
         {"$push": {"participants": email}}
     )
-
-    if len(activity["participants"]) + 1 > activity["max_participants"]:
-        print(f"Max participants exceeded for {activity_name}")
-        raise HTTPException(status_code=400, detail="Activity is full")
     
     if result.modified_count == 0:
         raise HTTPException(status_code=500, detail="Failed to update activity")    
