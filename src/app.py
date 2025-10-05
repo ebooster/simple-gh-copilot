@@ -129,6 +129,7 @@ def signup_for_activity(activity_name: str, email: str):
         raise HTTPException(status_code=500, detail="Failed to update activity")
 
     if len(activity["participants"]) + 1 > activity["max_participants"]:
+        print(f"Max participants exceeded for {activity_name}")
         raise HTTPException(status_code=400, detail="Activity is full")
     
     return {"message": f"Signed up {email} for {activity_name}"}
