@@ -131,7 +131,6 @@ def signup_for_activity(activity_name: str, email: str):
 
 
 # Unregister a participant from an activity
-from fastapi import Request
 
 @app.delete("/activities/{activity_name}/unregister")
 def unregister_from_activity(activity_name: str, email: str):
