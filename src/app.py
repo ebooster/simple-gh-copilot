@@ -122,7 +122,7 @@ def signup_for_activity(activity_name: str, email: str):
         raise HTTPException(status_code=400, detail="Student already signed up")
     
     # Check if activity is full
-    if len(activity["participants"]) + 1 > activity["max_participants"]:
+    if len(activity["participants"]) >= activity["max_participants"]:
         # Log that activity is full using Python logging.
         logging.warning(f"Max participants exceeded for {activity_name}")
         raise HTTPException(status_code=400, detail="Activity is full")
